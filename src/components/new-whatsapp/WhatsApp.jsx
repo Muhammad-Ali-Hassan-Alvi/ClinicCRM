@@ -1,20 +1,18 @@
-// src/components/WhatsApp.jsx
-
-import React, { useEffect, useRef, useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
-import socket from '../../lib/whatsappSocket';
-import WhatsappContainer from './WhatsappContainer';
-import InitialScreen from './InitialScreen';
-import QRModal from './QRModal';
+// src/components/WhatsApp.jsx (FINAL - With Correct Logout/Disconnect Handling)
+import React, { useEffect, useRef, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
+import socket from "../../lib/whatsappSocket";
+import WhatsappContainer from "./WhatsappContainer";
+import InitialScreen from "./InitialScreen";
+import QRModal from "./QRModal";
 
 export default function WhatsApp() {
-  const [status, setStatus] = useState('initializing'); // initializing | qr_received | ready | disconnected
+  const [status, setStatus] = useState("initializing"); // initializing | qr_received | ready | disconnected
   const [qr, setQr] = useState(null);
   const [chats, setChats] = useState([]);
   const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(true); // Add a general loading state for initial connection
+  const [loading, setLoading] = useState(true); // General loading for initial connection
 
-  // Using a ref to prevent state updates on unmounted component
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -24,81 +22,106 @@ export default function WhatsApp() {
   }, []);
 
   useEffect(() => {
-    // This function handles the response from our new handshake
+    // This function handles the response from our handshake
     const handleInitialStatus = (payload) => {
       if (!mounted.current) return;
 
       if (payload.ready) {
-        setStatus('ready');
+        setStatus("ready");
         setConnected(true);
         setChats(payload.chats || []);
-        toast.success('WhatsApp reconnected!');
+        toast.success("WhatsApp reconnected!");
       } else if (payload.qr) {
-        setStatus('qr_received');
+        setStatus("qr_received");
         setQr(payload.qr);
         setConnected(false);
       } else {
-        setStatus('initializing');
+        setStatus("initializing");
         setConnected(false);
       }
-      setLoading(false); // We have our initial status, stop loading
+      setLoading(false);
     };
 
     const onReady = () => {
       if (!mounted.current) return;
       setConnected(true);
-      setStatus('ready');
+      setStatus("ready");
       setQr(null);
-      toast.success('WhatsApp is ready!');
-      // Ask for chats since we are now ready
-      socket.emit('get-chats');
+      toast.success("WhatsApp is ready!");
+      socket.emit("get-chats");
     };
 
     const onQr = (dataUrl) => {
       if (!mounted.current) return;
-      setStatus('qr_received');
+      setStatus("qr_received");
       setQr(dataUrl);
       setConnected(false);
-      toast('QR code received, please scan.', { icon: '📱' });
+      toast("QR code received, please scan.", { icon: "📱" });
     };
 
     const onChats = (chatList) => {
       if (!mounted.current) return;
       setChats(chatList || []);
     };
-    
-    const onDisconnect = (reason) => {
-        if (!mounted.current) return;
-        setStatus('disconnected');
-        setConnected(false);
-        setQr(null);
-        toast.error(`Disconnected: ${reason}`);
-    };
 
     const onError = (msg) => {
-        if (!mounted.current) return;
-        toast.error(msg || 'An error occurred');
+      if (!mounted.current) return;
+      toast.error(msg || "An error occurred");
+    };
+
+    // ===================================================================
+    // *** THE FIX IS HERE ***
+    // ===================================================================
+    // This handler now listens for the backend's 'status' event
+    const handleStatusUpdate = (newStatus) => {
+      if (!mounted.current) return;
+      console.log("Received status update from backend:", newStatus);
+
+      // Update the main status, which controls the UI
+      setStatus(newStatus);
+
+      if (newStatus === "disconnected") {
+        setConnected(false);
+        setQr(null);
+        setChats([]);
+        toast.error("WhatsApp was disconnected. Please reconnect.");
+      } else if (newStatus === "ready") {
+        setConnected(true);
+      } else {
+        setConnected(false);
+      }
+    };
+
+    // This handles the physical socket disconnection (e.g., server restarts)
+    const onSocketDisconnect = () => {
+      if (!mounted.current) return;
+      console.log("Socket disconnected. Resetting UI.");
+      setLoading(true);
+      setStatus("initializing");
+      setConnected(false);
+      setQr(null);
+      setChats([]);
+      toast.error("Connection to server lost. Reconnecting...");
     };
 
     // --- The new, robust connection logic ---
     const onConnect = () => {
-      console.log('Socket connected! Requesting initial status.');
+      console.log("Socket connected! Requesting initial status.");
       setLoading(true);
-      // Explicitly ask the server for its state upon connecting
-      socket.emit('request-initial-status');
+      socket.emit("request-initial-status");
     };
 
     // Register listeners
-    socket.on('connect', onConnect);
-    socket.on('initial-status', handleInitialStatus); // Our new handshake event
-    socket.on('qr', onQr);
-    socket.on('ready', onReady);
-    socket.on('chats', onChats);
-    socket.on('updateChats', onChats); // Can use the same handler
-    socket.on('disconnect', onDisconnect);
-    socket.on('error-message', onError);
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onSocketDisconnect); // Use our new handler
+    socket.on("status", handleStatusUpdate); // Listen for status events
+    socket.on("initial-status", handleInitialStatus);
+    socket.on("qr", onQr);
+    socket.on("ready", onReady);
+    socket.on("chats", onChats);
+    socket.on("updateChats", onChats);
+    socket.on("error-message", onError);
 
-    // If socket is already connected, trigger the handshake manually
     if (socket.connected) {
       onConnect();
     } else {
@@ -107,45 +130,49 @@ export default function WhatsApp() {
 
     return () => {
       // Cleanup
-      socket.off('connect', onConnect);
-      socket.off('initial-status', handleInitialStatus);
-      socket.off('qr', onQr);
-      socket.off('ready', onReady);
-      socket.off('chats', onChats);
-      socket.off('updateChats', onChats);
-      socket.off('disconnect', onDisconnect);
-      socket.off('error-message', onError);
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onSocketDisconnect);
+      socket.off("status", handleStatusUpdate);
+      socket.off("initial-status", handleInitialStatus);
+      socket.off("qr", onQr);
+      socket.off("ready", onReady);
+      socket.off("chats", onChats);
+      socket.off("updateChats", onChats);
+      socket.off("error-message", onError);
     };
   }, []);
 
   const openConnect = () => {
-    setStatus('qr_loading'); // A state to show the modal with a loader
-    socket.emit('start-session');
+    setStatus("qr_loading");
+    socket.emit("start-session");
   };
 
   const handleLogout = () => {
-    socket.emit('logout');
+    socket.emit("logout");
     setConnected(false);
     setQr(null);
     setChats([]);
-    setStatus('initializing');
-    toast.success('Logged out successfully.');
+    setStatus("initializing");
+    toast.success("Logged out successfully.");
   };
 
-  if (loading && !connected) {
+  if (loading && status === "initializing") {
     return (
-        <div className="flex items-center justify-center h-screen bg-gray-100">
-            <div className="text-center">
-                <p>Connecting to server...</p>
-            </div>
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-center">
+          <p>Connecting to server...</p>
         </div>
+      </div>
     );
   }
+
+  // The main logic for what to render is now simpler
+  const isReady = status === "ready" && connected;
 
   return (
     <div className="bg-gray-100 font-sans text-gray-900">
       <Toaster position="top-center" />
-      {connected ? (
+      {isReady ? (
         <WhatsappContainer chats={chats} onLogout={handleLogout} />
       ) : (
         <div className="max-w-4xl mx-auto py-12 px-4">
@@ -154,24 +181,14 @@ export default function WhatsApp() {
       )}
 
       <QRModal
-        open={status === 'qr_received' || status === 'qr_loading'}
+        open={status === "qr_received" || status === "qr_loading"}
         qr={qr}
-        loading={status === 'qr_loading'}
-        onClose={() => setStatus('initializing')}
+        loading={status === "qr_loading"}
+        onClose={() => setStatus("initializing")}
       />
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
 
 // // src/components/WhatsApp.jsx
 // import React, { useEffect, useRef, useState } from 'react';
@@ -300,10 +317,10 @@ export default function WhatsApp() {
 //     setQrCode(null);
 //     setError(null);
 //     setStatus('🔄 Starting WhatsApp session...');
-    
+
 //     // Emit start-session to backend
 //     socket.emit('start-session');
-    
+
 //     // Set timeout to show error if QR doesn't appear within 5 seconds
 //     setTimeout(() => {
 //       if (mounted.current && !qrCode && loading && showModal) {
@@ -377,15 +394,15 @@ export default function WhatsApp() {
 //       {showModal && (
 //         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
 //           <div className="bg-white rounded-xl shadow-2xl p-6 w-96 max-w-[90vw] relative">
-//             <button 
-//               onClick={closeModal} 
+//             <button
+//               onClick={closeModal}
 //               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
 //             >
 //               <X className="w-5 h-5" />
 //             </button>
 
 //             <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-gray-800">
-//               <QrCode className="w-6 h-6 text-green-500" /> 
+//               <QrCode className="w-6 h-6 text-green-500" />
 //               Connect WhatsApp
 //             </h2>
 
@@ -410,9 +427,9 @@ export default function WhatsApp() {
 //               ) : qrCode ? (
 //                 <div>
 //                   <div className="bg-white p-4 rounded-lg border-2 border-gray-200 mb-4">
-//                     <img 
-//                       src={qrCode} 
-//                       alt="WhatsApp QR Code" 
+//                     <img
+//                       src={qrCode}
+//                       alt="WhatsApp QR Code"
 //                       className="mx-auto w-48 h-48 rounded-lg"
 //                     />
 //                   </div>
