@@ -112,7 +112,7 @@ const EmailViewModal = ({ isOpen, onOpenChange, emailId, accessToken }) => {
             size="icon"
             onClick={() => onOpenChange(false)}
           >
-            <X className="h-4 w-4" />
+            {/* <X className="h-4 w-4" /> */}
           </Button>
         </div>
 

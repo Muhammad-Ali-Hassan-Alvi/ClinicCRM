@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Send, Edit, Mail } from "lucide-react";
+import { Send, Edit, Mail, Inbox } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import EmailList from "@/components/email/EmailList";
 import EmailComposer from "@/components/email/EmailComposer";
@@ -11,11 +11,11 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { useToast } from "@/components/ui/use-toast";
 import { CLIENT_ID, SCOPES } from "../../main";
 
-const parseHeaders = (headers) => {
+const parseHeaders = (headers, primaryField = "to") => {
   const headerMap = new Map(
     headers.map((h) => [h.name.toLowerCase(), h.value])
   );
-  const to = headerMap.get("to") || "";
+  const to = headerMap.get(primaryField) || "";
   const subject = headerMap.get("subject") || "(No Subject)";
   const date = headerMap.get("date") || new Date().toISOString();
   const nameMatch = to.match(/(.*)<.*>/);
@@ -38,9 +38,6 @@ const EmailManagement = () => {
 
   const tokenClientRef = useRef(null);
 
-  // ===================================================================
-  // *** THE FIX IS HERE: Restored logic for fetching data ***
-  // ===================================================================
   async function loadSentEmails() {
     if (!accessToken) return;
     toast({ title: "Loading Sent Emails..." });
@@ -85,6 +82,55 @@ const EmailManagement = () => {
     }
   }
 
+  async function loadInboxEmails() {
+    if (!accessToken) return;
+
+    toast({ title: "Loading Inbox Emails..." });
+
+    try {
+      const listRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=INBOX&maxResults=20`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const listData = await listRes.json();
+      if (!listData.messages) {
+        setEmails([]);
+        return;
+      }
+      const details = await Promise.all(
+        listData.messages.map(async (m) => {
+          const detailRes = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          return detailRes.json();
+        })
+      );
+
+      const formattedEmails = details.map((e) => {
+        const headers = parseHeaders(e.payload.headers, "from");
+
+        return {
+          id: e.id,
+          folder: "inbox",
+          subject: headers.subject,
+          from: headers.displayName,
+          date: headers.date,
+          snippet: e.snippet,
+          read: !e.labelIds.includes("UNREAD"),
+        };
+      });
+
+      setEmails(formattedEmails);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Could not load the inbox Emails.",
+        variant: "destructive",
+      });
+    }
+  }
+
   async function getProfileInfo(token) {
     try {
       const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
@@ -103,10 +149,15 @@ const EmailManagement = () => {
     }
   }
 
-  // ===================================================================
-  // *** THE FIX IS HERE: Restored authentication logic ***
-  // ===================================================================
   useEffect(() => {
+    const savedToken = localStorage.getItem("gmail_access_token");
+    if (savedToken) {
+      console.log("Found saved Gmail token in localStorage.");
+      setAccessToken(savedToken);
+      getProfileInfo(savedToken);
+    }
+
+    
     if (window.google?.accounts?.oauth2) {
       tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
@@ -121,6 +172,10 @@ const EmailManagement = () => {
           }
           if (tokenResponse.access_token) {
             const token = tokenResponse.access_token;
+
+            console.log("Received new Gmail token, saving to localStorage.");
+            localStorage.setItem("gmail_access_token", token);
+
             setAccessToken(token);
             getProfileInfo(token);
             toast.success("Gmail connected successfully!");
@@ -132,9 +187,13 @@ const EmailManagement = () => {
 
   useEffect(() => {
     if (accessToken) {
-      loadSentEmails();
+      if (folder === "inbox") {
+        loadInboxEmails();
+      } else if (folder === "sent") {
+        loadSentEmails();
+      }
     }
-  }, [accessToken]);
+  }, [accessToken, folder]);
 
   const connectGmail = () => {
     if (tokenClientRef.current) {
@@ -147,7 +206,10 @@ const EmailManagement = () => {
     setIsViewModalOpen(true);
   };
 
-  const folders = [{ id: "sent", name: t("Sent"), icon: Send }];
+  const folders = [
+    { id: "sent", name: t("Sent"), icon: Send },
+    { id: "inbox", name: t("Inbox"), icon: Inbox },
+  ];
   const filteredEmails = emails
     .filter((email) => email.folder === folder)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -182,7 +244,19 @@ const EmailManagement = () => {
         >
           <Edit className="w-4 h-4" /> {t("Email Compose Title")}
         </Button>
-        <nav className="space-y-2">{/* Folder buttons can go here */}</nav>
+        <nav className="space-y-2">
+          {folders.map((f) => (
+            <Button
+              key={f.id}
+              onClick={() => navigate(`/email/${f.id}`)}
+              variant={folder === f.id ? "secondary" : "ghost"}
+              className="w-full flex items-center justify-start gap-3"
+            >
+              <f.icon className="w-5 h-5" />
+              <span>{f.name}</span>
+            </Button>
+          ))}
+        </nav>
       </motion.div>
 
       {/* Email List */}
