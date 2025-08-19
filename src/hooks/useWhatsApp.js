@@ -1,119 +1,133 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react";
 
 export const useWhatsApp = () => {
-  const [connected, setConnected] = useState(false)
-  const [qr, setQr] = useState(null)
-  const [chats, setChats] = useState([])
-  const [selectedChatId, setSelectedChatId] = useState(null)
-  const [messages, setMessages] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [connected, setConnected] = useState(false);
+  const [qr, setQr] = useState(null);
+  const [chats, setChats] = useState([]);
+  const [selectedChatId, setSelectedChatId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Poll QR code until connected
   useEffect(() => {
-    if (connected) return
+    if (connected) return;
 
     const checkConnection = async () => {
       try {
-        setLoading(true)
-        setError(null)
+        setLoading(true);
+        setError(null);
         const res = await fetch("https://backend-clinic-production.up.railway.app/qr")
-        const data = await res.json()
+        // const res = await fetch("http://localhost:3001/qr");
+        const data = await res.json();
 
         if (data.message === "Client already authenticated.") {
-          setConnected(true)
-          setQr(null)
+          setConnected(true);
+          setQr(null);
         } else if (data.qr) {
-          setQr(data.qr)
+          setQr(data.qr);
         } else if (data.error) {
-          setError(data.error)
+          setError(data.error);
         }
       } catch (err) {
-        setError("Failed to connect to server")
-        console.error(err)
+        setError("Failed to connect to server");
+        console.error(err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    checkConnection()
-    const interval = setInterval(checkConnection, 3000)
-    return () => clearInterval(interval)
-  }, [connected])
+    checkConnection();
+    const interval = setInterval(checkConnection, 3000);
+    return () => clearInterval(interval);
+  }, [connected]);
 
   // Fetch chats when connected
   useEffect(() => {
-    if (!connected) return
+    if (!connected) return;
 
     const fetchChats = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
         const res = await fetch("https://backend-clinic-production.up.railway.app/chats")
-        const data = await res.json()
-        setChats(data.chats || [])
+        // const res = await fetch("http://localhost:3001/chats");
+        const data = await res.json();
+        setChats(data.chats || []);
       } catch (e) {
-        console.error("Failed to fetch chats:", e)
-        setError("Failed to fetch chats")
+        console.error("Failed to fetch chats:", e);
+        setError("Failed to fetch chats");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchChats()
-  }, [connected])
+    fetchChats();
+  }, [connected]);
 
   // Fetch messages when chat changes
   useEffect(() => {
     if (!selectedChatId) {
-      setMessages([])
-      return
+      setMessages([]);
+      return;
     }
 
     const fetchMessages = async () => {
       try {
-        setLoading(true)
-        const res = await fetch(`https://backend-clinic-production.up.railway.app/messages?chatId=${selectedChatId}`)
-        const data = await res.json()
-        setMessages(data.messages || [])
+        setLoading(true);
+        const res = await fetch(
+          `https://backend-clinic-production.up.railway.app/messages?chatId=${selectedChatId}`
+        );
+        // const res = await fetch(
+        //   `http://localhost:3001/messages?chatId=${selectedChatId}`
+        // );
+        const data = await res.json();
+        setMessages(data.messages || []);
       } catch (e) {
-        console.error("Error fetching messages:", e)
-        setError("Failed to fetch messages")
+        console.error("Error fetching messages:", e);
+        setError("Failed to fetch messages");
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchMessages()
-  }, [selectedChatId])
+    fetchMessages();
+  }, [selectedChatId]);
 
   const sendMessage = useCallback(
     async (number, message) => {
-      if (!selectedChatId || !message.trim()) return
+      if (!selectedChatId || !message.trim()) return;
 
       try {
-        const chatId = selectedChatId
-        const res = await fetch("https://backend-clinic-production.up.railway.app/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chatId, message }),
-        })
+        const chatId = selectedChatId;
+        const res = await fetch(
+          "https://backend-clinic-production.up.railway.app/send",
+          // "http://localhost:3001/send",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chatId, message }),
+          }
+        );
 
-        const data = await res.json()
+        const data = await res.json();
         if (!data.success) {
-          throw new Error(data.error || "Failed to send message")
+          throw new Error(data.error || "Failed to send message");
         }
 
         // Refresh messages after sending
-        const messagesRes = await fetch(`https://backend-clinic-production.up.railway.app/messages?chatId=${selectedChatId}`)
-        const messagesData = await messagesRes.json()
-        setMessages(messagesData.messages || [])
+        const messagesRes = await fetch(
+          `https://backend-clinic-production.up.railway.app/messages?chatId=${selectedChatId}`
+          // `http://localhost:3001/messages?chatId=${selectedChatId}`
+        );
+        const messagesData = await messagesRes.json();
+        setMessages(messagesData.messages || []);
       } catch (err) {
-        console.error("Failed to send message:", err)
-        setError("Failed to send message")
+        console.error("Failed to send message:", err);
+        setError("Failed to send message");
       }
     },
-    [selectedChatId],
-  )
+    [selectedChatId]
+  );
 
   return {
     connected,
@@ -125,5 +139,5 @@ export const useWhatsApp = () => {
     sendMessage,
     loading,
     error,
-  }
-}
+  };
+};

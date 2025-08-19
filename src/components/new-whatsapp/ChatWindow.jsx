@@ -1,13 +1,14 @@
 // src/components/ChatWindow.jsx
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import socket from '../../lib/whatsappSocket';
-import MessageMedia from './MessageMedia'; // <--- IMPORT THE NEW COMPONENT
+import React, { useEffect, useRef, useState } from "react";
+import { Send } from "lucide-react";
+import { toast } from "react-hot-toast";
+import socket from "../../lib/whatsappSocket";
+import MessageMedia from "./MessageMedia";
+import MessageStatus from "./MessageStatus";
 
 export default function ChatWindow({ chat, messages = [], loading }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [localMessages, setLocalMessages] = useState([]);
   const messagesEndRef = useRef(null);
 
@@ -17,77 +18,142 @@ export default function ChatWindow({ chat, messages = [], loading }) {
   }, [messages, chat?.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [localMessages]);
+
+  useEffect(() => {
+    const handleAckUpdate = (update) => {
+      setLocalMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === update.messageId ? { ...msg, ack: update.ack } : msg
+        )
+      );
+    };
+
+    // This handler ONLY adds new messages sent FROM OTHERS to the chat
+    const handleNewMessage = (payload) => {
+      if (chat && payload.chatId === chat.id && !payload.message.fromMe) {
+        setLocalMessages((prev) => [...prev, payload.message]);
+      }
+    };
+
+    const handleSentConfirmation = (payload) => {
+      setLocalMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === payload.tempId ? payload.message : msg
+        )
+      );
+    };
+
+    // Register all the necessary listeners
+    socket.on("message_ack_update", handleAckUpdate);
+    socket.on("new_message", handleNewMessage);
+    socket.on("message_sent_confirmation", handleSentConfirmation);
+
+    // This cleanup function is crucial to prevent memory leaks and duplicate event listeners
+    return () => {
+      socket.off("message_ack_update", handleAckUpdate);
+      socket.off("new_message", handleNewMessage);
+      socket.off("message_sent_confirmation", handleSentConfirmation);
+    };
+  }, [chat]); // The dependency on 'chat' ensures we have the correct chat context
 
   const handleSend = (e) => {
     e?.preventDefault();
     if (!chat || !input.trim()) return;
-    const payload = { chatId: chat.id, message: input.trim() };
+    const tempId = `local-${Date.now()}`;
+    const payload = { chatId: chat.id, message: input.trim(), tempId: tempId };
 
     // Optimistic update
     const optimistic = {
-      id: `local-${Date.now()}`,
+      id: tempId,
       body: input.trim(),
       fromMe: true,
       timestamp: Math.floor(Date.now() / 1000),
       media: null, // No media for optimistic text messages
+      ack: 0,
     };
     setLocalMessages((prev) => [...prev, optimistic]);
-    setInput('');
+    setInput("");
 
     // emit to server
-    socket.emit('send-message', payload);
+    socket.emit("send-message", payload);
 
-    toast.success('Message sent');
+    toast.success("Message sent");
   };
 
   if (!chat) {
-    return <div className="flex-1 flex items-center justify-center text-gray-500">Select a chat to view messages</div>;
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-500">
+        Select a chat to view messages
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col h-[78vh]">
-      <div className="flex-1 overflow-y-auto p-4 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')]">
+      <div className="flex-1 overflow-y-auto p-4 overflow-x-hidden bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')]">
         {loading ? (
-          <div className="flex items-center justify-center h-full">Loading messages…</div>
+          <div className="flex items-center justify-center h-full">
+            Loading messages…
+          </div>
         ) : (
-          // =============== CHANGE START ===============
           (localMessages || []).map((m) => (
-            <div key={m.id} className={`mb-3 flex ${m.fromMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`px-3 py-2 rounded-lg max-w-[70%] shadow ${m.fromMe ? 'bg-green-200' : 'bg-white'}`}>
-                
+            <div
+              key={m.id}
+              className={`mb-3 flex ${
+                m.fromMe ? "justify-end" : "justify-start"
+              }`}
+            >
+              <div
+                className={`px-3 py-2 rounded-lg max-w-[70%] shadow ${
+                  m.fromMe ? "bg-green-200" : "bg-white"
+                }`}
+              >
                 {/* 1. RENDER THE MEDIA IF IT EXISTS */}
                 {m.media && <MessageMedia media={m.media} />}
 
                 {/* 2. RENDER THE BODY (CAPTION) IF IT EXISTS */}
-                {m.body && (
-                  <div className="text-sm">{m.body}</div>
-                )}
-                
-                {/* 3. RENDER THE TIMESTAMP */}
-                <div className="text-[10px] text-gray-500 mt-1 text-right">
-                  {new Date((m.timestamp || Date.now()/1000) * 1000).toLocaleTimeString()}
-                </div>
+                {m.body && <div className="text-sm">{m.body}</div>}
 
+                {/* 3. RENDER THE TIMESTAMP */}
+                <div className="text-[10px] text-gray-500 mt-1 flex items-center justify-end gap-1">
+                  <span>
+                    {new Date(
+                      (m.timestamp || Date.now() / 1000) * 1000
+                    ).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true,
+                    })}
+                  </span>
+
+                  {m.fromMe && <MessageStatus ack={m.ack} />}
+                </div>
               </div>
             </div>
           ))
-          // =============== CHANGE END =================
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} className="p-3 bg-gray-100 flex gap-2 items-center">
+      <form
+        onSubmit={handleSend}
+        className="p-3 bg-gray-100 flex gap-2 items-center"
+      >
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={chat ? 'Type a message' : 'Select a chat first'}
+          placeholder={chat ? "Type a message" : "Select a chat first"}
           disabled={!chat}
           className="flex-1 px-4 py-2 rounded-full border focus:outline-none"
         />
-        <button type="submit" disabled={!chat || !input.trim()} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full">
+        <button
+          type="submit"
+          disabled={!chat || !input.trim()}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full"
+        >
           <Send className="w-4 h-4" />
         </button>
       </form>

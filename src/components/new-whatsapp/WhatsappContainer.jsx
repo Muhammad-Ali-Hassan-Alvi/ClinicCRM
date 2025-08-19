@@ -1,13 +1,20 @@
 // src/components/ChatContainer.jsx
-import React, { useEffect, useState } from 'react';
-import ContactList from './ContactList';
-import ChatWindow from './ChatWindow';
-import socket from '../../lib/whatsappSocket';
+import React, { useEffect, useState } from "react";
+import ContactList from "./ContactList";
+import ChatWindow from "./ChatWindow";
+import socket from "../../lib/whatsappSocket";
 
 export default function WhatsappContainer({ chats = [], onLogout }) {
   const [selected, setSelected] = useState(null);
   const [messagesByChat, setMessagesByChat] = useState({}); // { chatId: [msg,..] }
   const [loadingMessages, setLoadingMessages] = useState(false);
+
+  const formatChatId = (id) => {
+    if (id && id.includes("@c.us")) {
+      return id.split("@")[0];
+    }
+    return id;
+  };
 
   useEffect(() => {
     const onChatMessages = ({ chatId, messages }) => {
@@ -34,22 +41,22 @@ export default function WhatsappContainer({ chats = [], onLogout }) {
       // Optionally update message id or state here
     };
 
-    socket.on('chat-messages', onChatMessages);
-    socket.on('newMessage', onNewMessage);
-    socket.on('message-sent', onMessageSent);
+    socket.on("chat-messages", onChatMessages);
+    socket.on("newMessage", onNewMessage);
+    socket.on("message-sent", onMessageSent);
 
     // cleanup
     return () => {
-      socket.off('chat-messages', onChatMessages);
-      socket.off('newMessage', onNewMessage);
-      socket.off('message-sent', onMessageSent);
+      socket.off("chat-messages", onChatMessages);
+      socket.off("newMessage", onNewMessage);
+      socket.off("message-sent", onMessageSent);
     };
   }, []);
 
   const selectChat = (chat) => {
     setSelected(chat);
     setLoadingMessages(true);
-    socket.emit('get-chat-messages', chat.id);
+    socket.emit("get-chat-messages", chat.id);
   };
 
   return (
@@ -66,8 +73,12 @@ export default function WhatsappContainer({ chats = [], onLogout }) {
       <div className="w-2/3 flex flex-col">
         <div className="p-3 border-b bg-white flex items-center justify-between">
           <div>
-            <h2 className="font-semibold text-lg">{selected?.name || 'Select a chat'}</h2>
-            <div className="text-xs text-gray-500">{selected?.id || '—'}</div>
+            <h2 className="font-semibold text-lg">
+              {selected?.name || "Select a chat"}
+            </h2>
+            <div className="text-xs text-gray-500">
+              {formatChatId(selected?.id) || "—"}
+            </div>
           </div>
           {/* <div>
             <button onClick={onLogout} className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Logout</button>
