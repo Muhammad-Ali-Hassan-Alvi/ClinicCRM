@@ -117,7 +117,7 @@ export default function WhatsApp() {
     socket.on("status", handleStatusUpdate); // Listen for status events
     socket.on("initial-status", handleInitialStatus);
     socket.on("qr", onQr);
-    socket.on("ready", onReady);
+    socket.on("status", handleStatusUpdate);
     socket.on("chats", onChats);
     socket.on("updateChats", onChats);
     socket.on("error-message", onError);
