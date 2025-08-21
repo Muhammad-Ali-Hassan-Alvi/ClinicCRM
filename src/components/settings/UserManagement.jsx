@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Edit2, User, Shield, KeyRound, Mail } from "lucide-react";
+import { Plus, Edit2, Shield, KeyRound, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +45,7 @@ const UserManagement = () => {
       setFormData({
         name: user.name,
         email: user.email,
-        password: "",
+        password: "", // Always clear password field for security
         role: user.role,
         branch_ids: user.branch_ids || [],
       });
@@ -55,7 +55,7 @@ const UserManagement = () => {
         name: "",
         email: "",
         password: "",
-        role: "Admin", // New users will be created as admins
+        role: "Agent", // Default role for new users
         branch_ids: [],
       });
     }
@@ -64,6 +64,15 @@ const UserManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Full Name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (!formData.email.trim()) {
       toast({
@@ -84,19 +93,18 @@ const UserManagement = () => {
     }
 
     if (editingUser) {
-      // For editing existing users, we can still update their profile
+      // For editing existing users, update their profile
       await updateUser(editingUser.id, {
         name: formData.name,
         role: formData.role,
         branch_ids: formData.branch_ids,
       });
     } else {
-      // For new users, we only need email and password
-      // The Edge Function will create an admin user with access to all branches
-      await addUser({
-        email: formData.email,
-        password: formData.password,
-      });
+      // ===================================================================
+      // *** THE FIX IS HERE: Send the ENTIRE formData object ***
+      // This sends name, role, branch_ids, etc. to your Edge Function.
+      // ===================================================================
+      await addUser(formData);
     }
 
     setIsDialogOpen(false);
@@ -113,11 +121,13 @@ const UserManagement = () => {
 
   const getBranchNames = (branchIds) => {
     if (!branchIds || branchIds.length === 0) return "No branches assigned";
-    return branchIds
-      .map(
-        (id) => settings.branches.find((b) => b.id === id)?.name || "Unknown"
-      )
-      .join(", ");
+    return (
+      branchIds
+        .map(
+          (id) => settings.branches.find((b) => b.id === id)?.name || "Unknown"
+        )
+        .join(", ") || "No branches assigned"
+    );
   };
 
   const handleResetPassword = () => {
@@ -212,7 +222,7 @@ const UserManagement = () => {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingUser ? "Edit User" : "Add New Admin User"}
+              {editingUser ? "Edit User" : "Add New User"}
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="p-1 space-y-4">
@@ -260,49 +270,34 @@ const UserManagement = () => {
                 />
               </div>
             )}
-            {editingUser ? (
-              <div>
-                <Label htmlFor="role">Role *</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      role: value,
-                      // This is your smart logic to handle Admin branch assignment - it's correct
-                      branch_ids:
-                        value === "Admin"
-                          ? settings.branches.map((b) => b.id)
-                          : prev.branch_ids,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* =================================================================== */}
-                    {/* *** THE FIX IS HERE: Ensure this .map() function is present *** */}
-                    {roles.map((role) => (
-                      <SelectItem key={role.id} value={role.name}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="role">Role</Label>
-                <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
-                  <Shield className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm text-gray-600">
-                    New users will be created as Admin with access to all branches
-                  </span>
-                </div>
-              </div>
-            )}
-            {editingUser && formData.role !== "Admin" && (
+            <div>
+              <Label htmlFor="role">Role *</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    role: value,
+                    branch_ids:
+                      value === "Admin"
+                        ? settings.branches.map((b) => b.id)
+                        : prev.branch_ids,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id || role.name} value={role.name}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {formData.role !== "Admin" && (
               <div>
                 <Label>Branch Access *</Label>
                 <div className="mt-2 space-y-2 max-h-40 overflow-y-auto p-2 border rounded-md">

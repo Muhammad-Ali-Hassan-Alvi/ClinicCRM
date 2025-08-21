@@ -17,7 +17,7 @@ export const useWhatsApp = () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("https://clinicbackend.netlify.app/qr")
+        const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/qr")
         // const res = await fetch("http://localhost:3001/qr");
         const data = await res.json();
 
@@ -49,7 +49,7 @@ export const useWhatsApp = () => {
     const fetchChats = async () => {
       try {
         setLoading(true);
-        const res = await fetch("https://clinicbackend.netlify.app/chats")
+        const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/chats")
         // const res = await fetch("http://localhost:3001/chats");
         const data = await res.json();
         setChats(data.chats || []);
@@ -75,7 +75,7 @@ export const useWhatsApp = () => {
       try {
         setLoading(true);
         const res = await fetch(
-          `https://clinicbackend.netlify.app/messages?chatId=${selectedChatId}`
+          `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
         );
         // const res = await fetch(
         //   `http://localhost:3001/messages?chatId=${selectedChatId}`
@@ -100,7 +100,7 @@ export const useWhatsApp = () => {
       try {
         const chatId = selectedChatId;
         const res = await fetch(
-          "https://clinicbackend.netlify.app/send",
+          "https://webappmernclinixbackend-production.up.railway.app/send",
           // "http://localhost:3001/send",
           {
             method: "POST",
@@ -116,7 +116,7 @@ export const useWhatsApp = () => {
 
         // Refresh messages after sending
         const messagesRes = await fetch(
-          `https://clinicbackend.netlify.app/messages?chatId=${selectedChatId}`
+          `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
           // `http://localhost:3001/messages?chatId=${selectedChatId}`
         );
         const messagesData = await messagesRes.json();

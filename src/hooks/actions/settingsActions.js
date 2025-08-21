@@ -38,15 +38,15 @@ export const createSettingsActions = ({ performDbAction }) => {
 
   const addUser = (userData) =>
     performDbAction(
-      // We are now calling the 'create-admin-user' Edge Function.
-      // This function handles both creating new admin users and resetting passwords.
+      // We are calling the 'create-admin-user' Edge Function, which can create any user.
       // It will NOT log out the currently logged-in admin.
       () =>
         supabase.functions.invoke("create-admin-user", {
-          body: {
-            email: userData.email,
-            password: userData.password,
-          },
+          // ===================================================================
+          // *** THE FIX IS HERE: Pass the ENTIRE userData object ***
+          // This ensures name, role, and branch_ids are all sent to the function.
+          // ===================================================================
+          body: userData,
         }),
       {
         titleKey: "toasts.userAdded.title",
