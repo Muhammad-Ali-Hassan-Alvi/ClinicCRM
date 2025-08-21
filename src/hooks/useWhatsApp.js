@@ -17,8 +17,8 @@ export const useWhatsApp = () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/qr")
-        // const res = await fetch("http://localhost:3001/qr");
+        // const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/qr")
+        const res = await fetch("http://localhost:3001/qr");
         const data = await res.json();
 
         if (data.message === "Client already authenticated.") {
@@ -49,8 +49,8 @@ export const useWhatsApp = () => {
     const fetchChats = async () => {
       try {
         setLoading(true);
-        const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/chats")
-        // const res = await fetch("http://localhost:3001/chats");
+        // const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/chats")
+        const res = await fetch("http://localhost:3001/chats");
         const data = await res.json();
         setChats(data.chats || []);
       } catch (e) {
@@ -74,12 +74,12 @@ export const useWhatsApp = () => {
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        const res = await fetch(
-          `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
-        );
         // const res = await fetch(
-        //   `http://localhost:3001/messages?chatId=${selectedChatId}`
+        //   `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
         // );
+        const res = await fetch(
+          `http://localhost:3001/messages?chatId=${selectedChatId}`
+        );
         const data = await res.json();
         setMessages(data.messages || []);
       } catch (e) {
@@ -100,8 +100,8 @@ export const useWhatsApp = () => {
       try {
         const chatId = selectedChatId;
         const res = await fetch(
-          "https://webappmernclinixbackend-production.up.railway.app/send",
-          // "http://localhost:3001/send",
+          // "https://webappmernclinixbackend-production.up.railway.app/send",
+          "http://localhost:3001/send",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -116,8 +116,8 @@ export const useWhatsApp = () => {
 
         // Refresh messages after sending
         const messagesRes = await fetch(
-          `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
-          // `http://localhost:3001/messages?chatId=${selectedChatId}`
+          // `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
+          `http://localhost:3001/messages?chatId=${selectedChatId}`
         );
         const messagesData = await messagesRes.json();
         setMessages(messagesData.messages || []);
