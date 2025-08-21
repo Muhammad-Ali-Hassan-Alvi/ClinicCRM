@@ -1,4 +1,6 @@
+// src/hooks/useWhatsApp.js
 import { useState, useEffect, useCallback } from "react";
+import socket from "@/lib/socket";
 
 export const useWhatsApp = () => {
   const [connected, setConnected] = useState(false);
@@ -9,125 +11,115 @@ export const useWhatsApp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Poll QR code until connected
+  // ---- Setup socket listeners ----
   useEffect(() => {
-    if (connected) return;
+    console.log("[IO] Hook mounted, setting up listeners...");
 
-    const checkConnection = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        // const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/qr")
-        const res = await fetch("http://localhost:3001/qr");
-        const data = await res.json();
+    socket.on("connect", () => {
+      console.log("[IO] Connected to server");
+      // Ask backend for current status
+      socket.emit("request-initial-status");
+    });
 
-        if (data.message === "Client already authenticated.") {
-          setConnected(true);
-          setQr(null);
-        } else if (data.qr) {
-          setQr(data.qr);
-        } else if (data.error) {
-          setError(data.error);
-        }
-      } catch (err) {
-        setError("Failed to connect to server");
-        console.error(err);
-      } finally {
-        setLoading(false);
+    socket.on("disconnect", () => {
+      console.log("[IO] Disconnected from server");
+      setConnected(false);
+    });
+
+    socket.on("status", (status) => {
+      console.log("[IO] Status update:", status);
+      if (status === "ready") {
+        setConnected(true);
+        socket.emit("get-chats");
+      } else {
+        setConnected(false);
       }
-    };
+    });
 
-    checkConnection();
-    const interval = setInterval(checkConnection, 3000);
-    return () => clearInterval(interval);
-  }, [connected]);
+    socket.on("qr", (qrData) => {
+      console.log("[IO] Received QR");
+      setQr(qrData);
+    });
 
-  // Fetch chats when connected
-  useEffect(() => {
-    if (!connected) return;
-
-    const fetchChats = async () => {
-      try {
-        setLoading(true);
-        // const res = await fetch("https://webappmernclinixbackend-production.up.railway.app/chats")
-        const res = await fetch("http://localhost:3001/chats");
-        const data = await res.json();
+    socket.on("initial-status", (data) => {
+      console.log("[IO] Initial status:", data);
+      if (data.ready) {
+        setConnected(true);
         setChats(data.chats || []);
-      } catch (e) {
-        console.error("Failed to fetch chats:", e);
-        setError("Failed to fetch chats");
-      } finally {
-        setLoading(false);
+      } else {
+        setConnected(false);
+        if (data.qr) setQr(data.qr);
       }
-    };
+    });
 
-    fetchChats();
-  }, [connected]);
+    socket.on("chats", (chatList) => {
+      console.log("[IO] Chats received:", chatList.length);
+      setChats(chatList);
+    });
 
-  // Fetch messages when chat changes
-  useEffect(() => {
-    if (!selectedChatId) {
-      setMessages([]);
-      return;
-    }
-
-    const fetchMessages = async () => {
-      try {
-        setLoading(true);
-        // const res = await fetch(
-        //   `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
-        // );
-        const res = await fetch(
-          `http://localhost:3001/messages?chatId=${selectedChatId}`
-        );
-        const data = await res.json();
-        setMessages(data.messages || []);
-      } catch (e) {
-        console.error("Error fetching messages:", e);
-        setError("Failed to fetch messages");
-      } finally {
-        setLoading(false);
+    socket.on("chat-messages", ({ chatId, messages }) => {
+      console.log(`[IO] Messages for ${chatId}:`, messages.length);
+      if (chatId === selectedChatId) {
+        setMessages(messages);
       }
-    };
+    });
 
-    fetchMessages();
+    socket.on("new_message", ({ chatId, message }) => {
+      console.log("[IO] New message:", message);
+      if (chatId === selectedChatId) {
+        setMessages((prev) => [...prev, message]);
+      }
+      // refresh chats preview
+      socket.emit("get-chats");
+    });
+
+    socket.on("error-message", (msg) => {
+      console.error("[IO] Error:", msg);
+      setError(msg);
+    });
+
+    return () => {
+      console.log("[IO] Cleaning up listeners...");
+      socket.off("connect");
+      socket.off("disconnect");
+      socket.off("status");
+      socket.off("qr");
+      socket.off("initial-status");
+      socket.off("chats");
+      socket.off("chat-messages");
+      socket.off("new_message");
+      socket.off("error-message");
+    };
   }, [selectedChatId]);
 
-  const sendMessage = useCallback(
-    async (number, message) => {
-      if (!selectedChatId || !message.trim()) return;
+  // ---- Actions ----
+  const loadMessages = useCallback((chatId) => {
+    setSelectedChatId(chatId);
+    setMessages([]); // reset before loading
+    socket.emit("get-chat-messages", chatId);
+  }, []);
 
-      try {
-        const chatId = selectedChatId;
-        const res = await fetch(
-          // "https://webappmernclinixbackend-production.up.railway.app/send",
-          "http://localhost:3001/send",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chatId, message }),
-          }
-        );
+  const sendMessage = useCallback((chatId, text) => {
+    if (!text.trim()) return;
+    socket.emit("send-message", {
+      chatId,
+      message: text,
+      tempId: Date.now(), // track optimistic message
+    });
+  }, []);
 
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.error || "Failed to send message");
-        }
+  const refreshChats = useCallback(() => {
+    socket.emit("get-chats");
+  }, []);
 
-        // Refresh messages after sending
-        const messagesRes = await fetch(
-          // `https://webappmernclinixbackend-production.up.railway.app/messages?chatId=${selectedChatId}`
-          `http://localhost:3001/messages?chatId=${selectedChatId}`
-        );
-        const messagesData = await messagesRes.json();
-        setMessages(messagesData.messages || []);
-      } catch (err) {
-        console.error("Failed to send message:", err);
-        setError("Failed to send message");
-      }
-    },
-    [selectedChatId]
-  );
+  const logout = useCallback(() => {
+    socket.emit("logout");
+    setConnected(false);
+    setChats([]);
+    setMessages([]);
+    setQr(null);
+    setSelectedChatId(null);
+  }, []);
 
   return {
     connected,
@@ -136,7 +128,10 @@ export const useWhatsApp = () => {
     selectedChatId,
     setSelectedChatId,
     messages,
+    loadMessages,
     sendMessage,
+    refreshChats,
+    logout,
     loading,
     error,
   };
