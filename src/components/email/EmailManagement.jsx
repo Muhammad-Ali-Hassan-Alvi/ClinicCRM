@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Send, Edit, Mail, Inbox } from "lucide-react";
+import { Send, Edit, Mail, Inbox, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import EmailList from "@/components/email/EmailList";
 import EmailComposer from "@/components/email/EmailComposer";
@@ -157,7 +157,6 @@ const EmailManagement = () => {
       getProfileInfo(savedToken);
     }
 
-    
     if (window.google?.accounts?.oauth2) {
       tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
         client_id: CLIENT_ID,
@@ -213,6 +212,33 @@ const EmailManagement = () => {
   const filteredEmails = emails
     .filter((email) => email.folder === folder)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const handleDisconnect = () => {
+    if (!accessToken) return;
+
+    fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+      method: "POST",
+      headers: { "Content-type": "application/x-www-form-urlencoded" },
+      mode: "no-cors",
+    })
+      .then(() => {
+        setAccessToken(null), setUserEmail(""), setEmails([]);
+        localStorage.removeItem("gmail_access_token");
+        toast.success("Gmail account deleted successfully");
+      })
+
+      .catch((error) => {
+        // console.error("Error revoking token: ", error);
+        setAccessToken(null);
+        setUserEmail("");
+        setEmails([]);
+        localStorage.removeItem("gmail_access_token");
+        toast({
+          title: "Disconnected",
+          description: "Your local session has been cleared",
+        });
+      });
+  };
 
   return (
     <div className="flex h-full bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100">
@@ -286,6 +312,19 @@ const EmailManagement = () => {
             Refresh Sent Items
           </Button>
         )}
+
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          {accessToken && ( 
+            <Button
+              variant="ghost"
+              className="w-full flex items-center justify-start gap-3 text-red-500 hover:bg-red-50 hover:text-red-600"
+              onClick={handleDisconnect}
+            >
+              <LogOut className="w-5 h-5" />
+              <span>Disconnect</span>
+            </Button>
+          )}
+        </div>
       </main>
     </div>
   );
