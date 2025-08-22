@@ -13,8 +13,11 @@ export function CustomToaster() {
         const finalTitle = titleKey ? t(titleKey) : title;
         const finalDescription = descriptionKey ? t(descriptionKey, descriptionValues) : description;
 
+        // Destructure dismiss from props to avoid passing it to the DOM element
+        const { dismiss, ...toastProps } = props;
+        
         return (
-          <Toast key={id} {...props}>
+          <Toast key={id} {...toastProps}>
             <div className="grid gap-1">
               {finalTitle && <ToastTitle>{finalTitle}</ToastTitle>}
               {finalDescription && (

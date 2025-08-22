@@ -63,11 +63,14 @@ const LoginPage = () => {
     setIsLoading(false);
   };
 
+  // LoginPage.jsx
+
   const handleCreateAdmin = async () => {
     if (!email || !password) {
       toast({
         title: "Missing Info",
-        description: "Please enter the missing password or the email",
+        description:
+          "Please enter an email and password for the admin account.",
         variant: "destructive",
       });
       return;
@@ -78,13 +81,18 @@ const LoginPage = () => {
       description: "Please wait...",
     });
 
+    // ===================================================================
+    // *** THE FIX IS HERE: Send all the required fields in the body ***
+    // ===================================================================
     const { data, error } = await supabase.functions.invoke(
-      "create-admin-user",
+      "create-admin-user", // Fixed: Use the correct function name
       {
         body: {
-          email,
-          password,
-          branchId,
+          email: email,
+          password: password,
+          name: "Admin", // Provide a default name for the admin
+          role: "Admin", // Provide the 'Admin' role
+          branch_ids: [], // Admin access is handled by RLS, send an empty array
         },
       }
     );
@@ -92,32 +100,18 @@ const LoginPage = () => {
     if (error) {
       toast({
         title: "Admin Setup Failed",
-        description: error.message,
+        description: error.message || "An unknown error occurred.",
         variant: "destructive",
       });
-    }
-    // else {
-    //   if (data.message) {
-    //      toast({
-    //       title: "Admin Account Ready",
-    //       description: data.message + " You can now log in.",
-    //     });
-    //   } else if (data.user) {
-    //     toast({
-    //       title: "Admin Account Created!",
-    //       description: "You can now log in. Email: admin@lamel.clinic, Password: password123",
-    //     });
-    //   }
-    // }
-    else {
+    } else {
+      // The success message can be simplified or use data from the response
       toast({
-        title: "Admin Account Created Successfully",
-        description: `Admin account for ${email} is ready. You can now log in.`,
+        title: "Success!",
+        description: data.message || `Admin account for ${email} is ready.`,
       });
     }
     setIsCreatingAdmin(false);
   };
-
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 p-4">
       <motion.div

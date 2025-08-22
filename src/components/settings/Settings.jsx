@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useData } from '@/contexts/DataContext';
-import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/hooks/useRole';
 import SettingsCard from '@/components/settings/SettingsCard';
 import EditableList from '@/components/settings/EditableList';
 import WhatsappSettings from '@/components/settings/WhatsappSettings';
@@ -24,14 +24,17 @@ import TelephonySettings from './TelephonySettings';
 
 const Settings = () => {
   const { settings, updateSettings } = useData();
-  const { currentUser } = useData();
   const { t } = useLocale();
+  const { isAdmin, role } = useRole();
 
-  if (currentUser?.role !== 'Admin') {
+  if (!isAdmin) {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold">Access Denied</h1>
         <p>You do not have permission to view this page.</p>
+        <p className="text-sm text-gray-500 mt-2">
+          Current role: {role || 'Unknown'} (Need: Admin)
+        </p>
       </div>
     );
   }

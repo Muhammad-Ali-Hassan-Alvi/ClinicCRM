@@ -23,6 +23,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
 import { DataProvider } from '@/contexts/DataContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { ChatProvider } from '@/contexts/ChatContext';
 import { CustomToaster } from '@/components/CustomToaster';
 import { useLocale } from '@/contexts/LocaleContext';
 import { Loader2 } from 'lucide-react';
@@ -58,9 +59,11 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               <DataProvider>
-                <TelephonyProvider>
-                  <DashboardLayout />
-                </TelephonyProvider>
+                <ChatProvider>
+                  <TelephonyProvider>
+                    <DashboardLayout />
+                  </TelephonyProvider>
+                </ChatProvider>
               </DataProvider>
             </ProtectedRoute>
           }

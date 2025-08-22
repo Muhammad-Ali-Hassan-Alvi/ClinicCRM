@@ -6,12 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { History, Users, UserCheck, Ticket, HeartHandshake, Phone } from 'lucide-react';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useData } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
 import useHistoryData from '@/hooks/useHistoryData';
 import HistoryViewer from '@/components/shared/HistoryViewer';
 
 const HistoryManagement = () => {
   const { t } = useLocale();
   const { currentUser, settings } = useData();
+  const { user } = useAuth(); // Get user directly from AuthContext
   const { 
     contactHistory, 
     leadHistory, 
@@ -23,11 +25,17 @@ const HistoryManagement = () => {
   
   const [selectedBranch, setSelectedBranch] = useState('all');
 
-  if (currentUser?.role !== 'Admin') {
+  // Check role from both sources for better reliability
+  const userRole = user?.role || currentUser?.role;
+
+  if (userRole !== 'Admin') {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold">Access Denied</h1>
         <p>You do not have permission to view this page.</p>
+        <p className="text-sm text-gray-500 mt-2">
+          Current role: {userRole || 'Unknown'} (Need: Admin)
+        </p>
       </div>
     );
   }

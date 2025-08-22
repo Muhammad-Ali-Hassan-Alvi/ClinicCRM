@@ -163,14 +163,17 @@ export const AuthProvider = ({ children }) => {
         
         const camelProfile = keysToCamel(userProfile);
 
-        if (camelProfile.role !== 'Admin' && (!camelProfile.branchIds || !camelProfile.branchIds.includes(branchId))) {
-          await supabase.auth.signOut();
-          toast({
-            title: "Access Denied",
-            description: "You do not have access to this branch.",
-            variant: "destructive",
-          });
-          return false;
+        // Admin users can access any branch, regular users need specific branch access
+        if (camelProfile.role !== 'Admin') {
+          if (!camelProfile.branchIds || !camelProfile.branchIds.includes(branchId)) {
+            await supabase.auth.signOut();
+            toast({
+              title: "Access Denied",
+              description: "You do not have access to this branch.",
+              variant: "destructive",
+            });
+            return false;
+          }
         }
         
         const newActiveBranch = camelProfile.role === 'Admin' ? (branchId || 'all') : branchId;
