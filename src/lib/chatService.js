@@ -1,174 +1,36 @@
 import { supabase } from './supabaseClient';
 
 class ChatService {
-  constructor() {
-    this.subscriptions = new Map();
-    this.messageCallbacks = new Map();
-    this.chatMemberCallbacks = new Map();
-  }
-
-  // Initialize Realtime subscriptions
-  async initializeRealtime(userId) {
-    if (this.subscriptions.has('messages')) {
-      this.subscriptions.get('messages').unsubscribe();
-    }
-    if (this.subscriptions.has('chat_members')) {
-      this.subscriptions.get('chat_members').unsubscribe();
-    }
-
-    // Subscribe to new messages
-    const messagesSubscription = supabase
-      .channel('messages')
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'messages' 
-        }, 
-        (payload) => {
-          this.handleNewMessage(payload.new);
-        }
-      )
-      .subscribe();
-
-    // Subscribe to new chat members
-    const chatMembersSubscription = supabase
-      .channel('chat_members')
-      .on('postgres_changes', 
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'chat_members' 
-        }, 
-        (payload) => {
-          this.handleNewChatMember(payload.new);
-        }
-      )
-      .subscribe();
-
-    this.subscriptions.set('messages', messagesSubscription);
-    this.subscriptions.set('chat_members', chatMembersSubscription);
-  }
-
-  // Handle new message from Realtime
-  handleNewMessage(message) {
-    this.messageCallbacks.forEach((callback) => {
-      callback(message);
-    });
-  }
-
-  // Handle new chat member from Realtime
-  handleNewChatMember(chatMember) {
-    this.chatMemberCallbacks.forEach((callback) => {
-      callback(chatMember);
-    });
-  }
-
-  // Register callback for new messages
-  onNewMessage(callback) {
-    const id = Date.now().toString();
-    this.messageCallbacks.set(id, callback);
-    return () => this.messageCallbacks.delete(id);
-  }
-
-  // Register callback for new chat members
-  onNewChatMember(callback) {
-    const id = Date.now().toString();
-    this.chatMemberCallbacks.set(id, callback);
-    return () => this.chatMemberCallbacks.delete(id);
-  }
-
-  // Cleanup subscriptions
   cleanup() {
-    this.subscriptions.forEach(subscription => {
-      subscription.unsubscribe();
-    });
-    this.subscriptions.clear();
-    this.messageCallbacks.clear();
-    this.chatMemberCallbacks.clear();
+    // This is a good safety net to clean up all connections on logout.
+    supabase.removeAllChannels();
   }
 
-  // Get user's chat list
+  // Get user's chat list - Logic is fine, can be slightly optimized.
   async getUserChats(userId) {
     try {
       const { data: chatMemberships, error: membershipError } = await supabase
         .from('chat_members')
-        .select(`
-          chat_id,
-          chats (
-            id,
-            name,
-            description,
-            created_at,
-            updated_at,
-            created_by,
-            profiles!chats_created_by_fkey (
-              id,
-              name,
-              avatar_url
-            )
-          )
-        `)
-        .eq('user_id', userId)
-        .order('joined_at', { ascending: false });
-
+        .select(`chats(*, profiles!chats_created_by_fkey(*))`)
+        .eq('user_id', userId);
       if (membershipError) throw membershipError;
 
-      // Get the latest message for each chat
-      const chatsWithLatestMessage = await Promise.all(
-        chatMemberships.map(async (membership) => {
-          const { data: latestMessage } = await supabase
-            .from('messages')
-            .select(`
-              id,
-              content,
-              created_at,
-              user_id,
-              profiles!messages_user_id_fkey (
-                id,
-                name,
-                avatar_url
-              )
-            `)
-            .eq('chat_id', membership.chats.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          return {
-            ...membership.chats,
-            latestMessage: latestMessage || null
-          };
-        })
-      );
-
-      return { data: chatsWithLatestMessage, error: null };
+      const chats = chatMemberships.map(m => m.chats).filter(Boolean);
+      return { data: chats, error: null };
     } catch (error) {
       console.error('Error fetching user chats:', error);
       return { data: null, error };
     }
   }
 
-  // Get messages for a specific chat
-  async getChatMessages(chatId, limit = 50, offset = 0) {
+  // Get messages for a specific chat - Logic is fine.
+  async getChatMessages(chatId) {
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          profiles!messages_user_id_fkey (
-            id,
-            name,
-            avatar_url
-          )
-        `)
+        .select(`*, profiles!messages_user_id_fkey(*)`)
         .eq('chat_id', chatId)
-        .order('created_at', { ascending: true })
-        .range(offset, offset + limit - 1);
-
+        .order('created_at', { ascending: true });
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
@@ -177,31 +39,14 @@ class ChatService {
     }
   }
 
-  // Send a message
+  // Send a message - Logic is fine.
   async sendMessage(chatId, userId, content) {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('messages')
-        .insert({
-          chat_id: chatId,
-          user_id: userId,
-          content: content.trim()
-        })
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          profiles!messages_user_id_fkey (
-            id,
-            name,
-            avatar_url
-          )
-        `)
-        .single();
-
+        .insert({ chat_id: chatId, user_id: userId, content: content.trim() });
       if (error) throw error;
-      return { data, error: null };
+      return { data: true, error: null };
     } catch (error) {
       console.error('Error sending message:', error);
       return { data: null, error };

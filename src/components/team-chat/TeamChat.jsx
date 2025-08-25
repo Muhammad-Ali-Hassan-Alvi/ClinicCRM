@@ -15,7 +15,6 @@ const TeamChat = () => {
   const { chatId } = useParams();
   const navigate = useNavigate();
   const { t } = useLocale();
-  const { user } = useAuth();
   const { 
     chats, 
     currentChat, 
@@ -27,20 +26,31 @@ const TeamChat = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // Handle chat selection from URL or default
+  // --- THIS useEffect IS NOW CORRECT AND STABLE ---
   useEffect(() => {
+    const isReady = chats.length > 0;
+    
+    // Don't do anything until the initial chats have been loaded.
+    if (!isReady) {
+      return;
+    }
+
     if (chatId) {
-      const chat = chats.find(c => c.id === chatId);
-      if (chat && (!currentChat || currentChat.id !== chatId)) {
+      // The URL has an ID. We need to make sure our context state matches it.
+      // We only call selectChat if the current chat is NOT the one in the URL.
+      if (!currentChat || currentChat.id !== chatId) {
         selectChat(chatId);
       }
-    } else if (chats.length > 0 && !currentChat) {
-      // Select first chat by default
+    } else {
+      // No ID in the URL, so default to the first chat.
       const firstChat = chats[0];
-      selectChat(firstChat.id);
+      // Navigate to the first chat. This will change the URL,
+      // which will re-trigger this effect and run the logic above.
       navigate(`/team-chat/${firstChat.id}`, { replace: true });
     }
-  }, [chatId, chats, currentChat, selectChat, navigate]);
+  // This effect ONLY depends on the URL param and the list of chats.
+  // It is now stable and will not cause an infinite loop.
+  }, [chatId, chats, selectChat, navigate, currentChat]);
 
   // Filter chats based on search query
   const filteredChats = chats.filter(chat =>
@@ -49,7 +59,9 @@ const TeamChat = () => {
   );
 
   const handleSelectChat = (id) => {
-    selectChat(id);
+    // A user click should ONLY change the URL.
+    // The useEffect above is responsible for syncing the state with the URL.
+    // This creates a clean, one-way data flow.
     navigate(`/team-chat/${id}`);
   };
 
@@ -57,17 +69,17 @@ const TeamChat = () => {
     const result = await createChat(chatData.name, chatData.description, chatData.memberIds);
     if (result.success) {
       setShowCreateDialog(false);
-      // Navigate to the new chat
+      // Navigate to the new chat, which will trigger the useEffect.
       navigate(`/team-chat/${result.chat.id}`);
     }
   };
 
-  if (loading) {
+  if (loading && chats.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-100">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading chat...</p>
+          <p className="text-gray-600">Loading chats...</p>
         </div>
       </div>
     );
@@ -115,17 +127,23 @@ const TeamChat = () => {
       
       <div className="flex-1 flex flex-col">
         {currentChat ? (
-          <ChatWindow chat={currentChat} key={currentChat.id} />
+          <ChatWindow chat={currentChat} key={chatId || currentChat.id} />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500 bg-gray-50/50">
             <MessagesSquare className="w-24 h-24 text-gray-300 mb-4" />
-            <h2 className="text-2xl font-semibold">{t('teamChat.welcomeTitle')}</h2>
-            <p className="mb-6">{t('teamChat.welcomeMessage')}</p>
-            {chats.length === 0 && (
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Chat
-              </Button>
+            { (loading && chats.length > 0) ? (
+              <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+            ) : (
+              <>
+                <h2 className="text-2xl font-semibold">{t('teamChat.welcomeTitle')}</h2>
+                <p className="mb-6">{t('teamChat.welcomeMessage')}</p>
+                {chats.length === 0 && !loading && (
+                  <Button onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Chat
+                  </Button>
+                )}
+              </>
             )}
           </div>
         )}

@@ -47,12 +47,16 @@ const ChatWindow = ({ chat }) => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (newMessage.trim() === '' || isSending) return;
+    e.stopPropagation();
+    
+    if (newMessage.trim() === '' || isSending) {
+      return false;
+    }
 
     setIsSending(true);
     try {
       const result = await sendMessage(newMessage.trim());
-      if (result.success) {
+      if (result && result.success) {
         setNewMessage('');
       }
     } catch (error) {
@@ -60,6 +64,8 @@ const ChatWindow = ({ chat }) => {
     } finally {
       setIsSending(false);
     }
+    
+    return false;
   };
 
   const handleDeleteChat = async () => {
@@ -204,24 +210,25 @@ const ChatWindow = ({ chat }) => {
 
       {/* Message Input */}
       <footer className="p-4 bg-white/80 backdrop-blur-lg border-t border-gray-200/80">
-        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={t('teamChat.messagePlaceholder')}
-            className="flex-1"
-            disabled={isSending}
-          />
-          <Button 
-            type="submit" 
-            disabled={isSending || !newMessage.trim()}
-            size="sm"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </form>
+      <form onSubmit={handleSendMessage} className="flex items-center gap-2" noValidate>
+  <Input
+    ref={inputRef}
+    type="text"
+    value={newMessage}
+    onChange={(e) => setNewMessage(e.target.value)}
+    placeholder={t('teamChat.messagePlaceholder')}
+    className="flex-1"
+    disabled={isSending}
+  />
+  <Button 
+    type="submit"   // keep this submit, but preventDefault handles reload
+    disabled={isSending || !newMessage.trim()}
+    size="sm"
+  >
+    <Send className="w-4 h-4" />
+  </Button>
+</form>
+
       </footer>
     </div>
   );

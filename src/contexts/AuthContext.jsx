@@ -227,7 +227,7 @@ export const AuthProvider = ({ children }) => {
   const setActiveBranch = (branchId) => {
     setActiveBranchState(branchId);
     localStorage.setItem('clinic-activeBranch', branchId);
-    window.location.reload();
+    // window.location.reload();
   };
 
   const value = { 
