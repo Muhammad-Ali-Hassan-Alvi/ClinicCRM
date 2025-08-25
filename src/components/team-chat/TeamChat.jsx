@@ -76,75 +76,103 @@ const TeamChat = () => {
 
   if (loading && chats.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-100">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading chats...</p>
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <MessagesSquare className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-500 w-6 h-6" />
+          </div>
+          <p className="text-gray-600 font-medium">Loading your conversations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-transparent">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      {/* Sidebar */}
       <motion.div 
         initial={{ x: -320 }}
         animate={{ x: 0 }}
         transition={{ duration: 0.5, ease: "easeInOut" }}
-        className="w-80 border-r border-gray-200/50 bg-white/60 backdrop-blur-lg flex flex-col"
+        className="w-80 bg-white shadow-lg border-r border-gray-200 flex flex-col"
       >
-        <div className="p-4 border-b border-gray-200/50">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-              <MessagesSquare className="text-blue-500" />
-              {t('sidebar.teamChat')}
-            </h2>
+        {/* Header */}
+        <div className="p-6 border-b border-gray-200 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <MessagesSquare className="text-white w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{t('sidebar.teamChat')}</h2>
+                <p className="text-sm text-gray-500">{chats.length} conversations</p>
+              </div>
+            </div>
             <Button
               size="sm"
               onClick={() => setShowCreateDialog(true)}
-              className="h-8 w-8 p-0"
+              className="h-9 w-9 p-0 bg-blue-500 hover:bg-blue-600 rounded-lg shadow-sm"
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input 
               placeholder={t('teamChat.searchPlaceholder')} 
-              className="pl-9"
+              className="pl-10 h-10 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-300 transition-colors"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
         
-        <ChatList
-          chats={filteredChats}
-          onSelectChat={handleSelectChat}
-          selectedChatId={currentChat?.id}
-        />
+        {/* Chat List */}
+        <div className="flex-1 overflow-hidden">
+          <ChatList
+            chats={filteredChats}
+            onSelectChat={handleSelectChat}
+            selectedChatId={currentChat?.id}
+          />
+        </div>
       </motion.div>
       
-      <div className="flex-1 flex flex-col">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {currentChat ? (
-          <ChatWindow chat={currentChat} key={chatId || currentChat.id} />
+          <ChatWindow chat={currentChat} />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-500 bg-gray-50/50">
-            <MessagesSquare className="w-24 h-24 text-gray-300 mb-4" />
-            { (loading && chats.length > 0) ? (
-              <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-            ) : (
-              <>
-                <h2 className="text-2xl font-semibold">{t('teamChat.welcomeTitle')}</h2>
-                <p className="mb-6">{t('teamChat.welcomeMessage')}</p>
-                {chats.length === 0 && !loading && (
-                  <Button onClick={() => setShowCreateDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Your First Chat
-                  </Button>
-                )}
-              </>
-            )}
+          <div className="flex-1 flex flex-col items-center justify-center text-center bg-white">
+            <div className="max-w-md mx-auto px-6">
+              <div className="w-24 h-24 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <MessagesSquare className="w-12 h-12 text-blue-500" />
+              </div>
+              
+              {loading && chats.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+                  <p className="text-gray-600">Loading conversation...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <h2 className="text-2xl font-bold text-gray-900">{t('teamChat.welcomeTitle')}</h2>
+                  <p className="text-gray-600 leading-relaxed">{t('teamChat.welcomeMessage')}</p>
+                  
+                  {chats.length === 0 && !loading && (
+                    <Button 
+                      onClick={() => setShowCreateDialog(true)}
+                      className="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-lg shadow-sm"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Chat
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

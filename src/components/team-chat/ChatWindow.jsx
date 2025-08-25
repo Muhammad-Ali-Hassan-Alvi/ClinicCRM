@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Users, MoreVertical, Trash2, UserPlus } from 'lucide-react';
+import { Send, Users, MoreVertical, Trash2, UserPlus, Settings, AlertTriangle } from 'lucide-react';
 import { useChat } from '@/contexts/ChatContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -17,11 +18,23 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const ChatWindow = ({ chat }) => {
   const { messages, sendMessage, deleteChat, addMemberToChat, allUsers, chatMembers } = useChat();
@@ -29,6 +42,7 @@ const ChatWindow = ({ chat }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedUser, setSelectedUser] = useState('');
   const { toast } = useToast();
   const { t } = useLocale();
@@ -69,10 +83,6 @@ const ChatWindow = ({ chat }) => {
   };
 
   const handleDeleteChat = async () => {
-    if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
-      return;
-    }
-
     try {
       const result = await deleteChat(chat.id);
       if (result.success) {
@@ -120,69 +130,53 @@ const ChatWindow = ({ chat }) => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50/50">
+    <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
       {/* Header */}
-      <header className="p-4 border-b border-gray-200/80 bg-white/70 backdrop-blur-lg flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
+      <header className="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm">
             {getInitials(chat.name)}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">{chat.name}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{chat.name}</h2>
             {chat.description && (
               <p className="text-sm text-gray-500">{chat.description}</p>
             )}
+            <div className="flex items-center gap-2 mt-1">
+              <Users className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500">{chatMembers.length} members</span>
+            </div>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <UserPlus className="w-4 h-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Member to Chat</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="user-select">Select User</Label>
-                  <select
-                    id="user-select"
-                    value={selectedUser}
-                    onChange={(e) => setSelectedUser(e.target.value)}
-                    className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="">Choose a user...</option>
-                    {availableUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Button onClick={handleAddMember} disabled={!selectedUser}>
-                  Add Member
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAddMember(true)}
+            className="h-9 px-3 text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Add Member
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
                 <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => setShowAddMember(true)}>
                 <UserPlus className="w-4 h-4 mr-2" />
                 Add Member
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               {isChatCreator && (
-                <DropdownMenuItem onClick={handleDeleteChat} className="text-red-600">
+                <DropdownMenuItem 
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Chat
                 </DropdownMenuItem>
@@ -193,43 +187,136 @@ const ChatWindow = ({ chat }) => {
       </header>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
-              <p>No messages yet. Start the conversation!</p>
-            </div>
-          ) : (
-            messages.map(msg => (
-              <ChatMessage key={msg.id} message={msg} />
-            ))
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-6 space-y-4">
+            {messages.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Send className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-gray-900 font-medium mb-2">No messages yet</h3>
+                <p className="text-gray-500 text-sm">Start the conversation by sending a message!</p>
+              </div>
+            ) : (
+              messages.map(msg => (
+                <ChatMessage key={msg.id} message={msg} />
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Message Input */}
-      <footer className="p-4 bg-white/80 backdrop-blur-lg border-t border-gray-200/80">
-      <form onSubmit={handleSendMessage} className="flex items-center gap-2" noValidate>
-  <Input
-    ref={inputRef}
-    type="text"
-    value={newMessage}
-    onChange={(e) => setNewMessage(e.target.value)}
-    placeholder={t('teamChat.messagePlaceholder')}
-    className="flex-1"
-    disabled={isSending}
-  />
-  <Button 
-    type="submit"   // keep this submit, but preventDefault handles reload
-    disabled={isSending || !newMessage.trim()}
-    size="sm"
-  >
-    <Send className="w-4 h-4" />
-  </Button>
-</form>
-
+      <footer className="p-6 border-t border-gray-200 bg-white">
+        <form onSubmit={handleSendMessage} className="flex items-center gap-3" noValidate>
+          <Input
+            ref={inputRef}
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder={t('teamChat.messagePlaceholder')}
+            className="flex-1 h-12 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-300 transition-colors"
+            disabled={isSending}
+          />
+          <Button 
+            type="submit"
+            disabled={isSending || !newMessage.trim()}
+            size="sm"
+            className="h-12 px-6 bg-blue-500 hover:bg-blue-600 shadow-sm"
+          >
+            {isSending ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+        </form>
       </footer>
+
+      {/* Add Member Dialog */}
+      <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-blue-500" />
+              Add Member to Chat
+            </DialogTitle>
+            <DialogDescription>
+              Select a user to add to "{chat.name}". They will be able to see and send messages in this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="user-select">Select User</Label>
+              <Select value={selectedUser} onValueChange={setSelectedUser}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map(user => (
+                    <SelectItem key={user.id} value={user.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium">
+                          {getInitials(user.name)}
+                        </div>
+                        {user.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {availableUsers.length === 0 && (
+              <div className="text-center py-4 text-gray-500">
+                <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                <p className="text-sm">All users are already members of this chat</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMember(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddMember} 
+              disabled={!selectedUser || availableUsers.length === 0}
+              className="bg-blue-500 hover:bg-blue-600"
+            >
+              Add Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              Delete Chat
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{chat.name}"? This action cannot be undone. 
+              All messages and member associations will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteChat}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              Delete Chat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

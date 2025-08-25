@@ -10,9 +10,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Users, MessageSquare, Loader2 } from 'lucide-react';
 
 const CreateChatDialog = ({ open, onOpenChange, onCreateChat }) => {
   const { allUsers } = useChat();
@@ -66,66 +69,101 @@ const CreateChatDialog = ({ open, onOpenChange, onCreateChat }) => {
     onOpenChange(newOpen);
   };
 
+  const getInitials = (name) => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create New Chat</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-blue-500" />
+            Create New Chat
+          </DialogTitle>
+          <DialogDescription>
+            Create a new conversation and invite team members to join. You can add members later as well.
+          </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="chat-name">Chat Name *</Label>
-            <Input
-              id="chat-name"
-              value={chatName}
-              onChange={(e) => setChatName(e.target.value)}
-              placeholder="Enter chat name"
-              required
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter chat description (optional)"
-              rows={3}
-            />
-          </div>
-          
-          <div>
-            <Label>Add Members</Label>
-            <ScrollArea className="h-32 border rounded-md p-2">
-              {availableUsers.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  No other users available
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {availableUsers.map(user => (
-                    <div key={user.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`user-${user.id}`}
-                        checked={selectedUsers.includes(user.id)}
-                        onCheckedChange={() => handleUserToggle(user.id)}
-                      />
-                      <Label 
-                        htmlFor={`user-${user.id}`}
-                        className="text-sm font-normal cursor-pointer flex-1"
-                      >
-                        {user.name}
-                      </Label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="chat-name" className="text-sm font-medium text-gray-700">
+                Chat Name *
+              </Label>
+              <Input
+                id="chat-name"
+                value={chatName}
+                onChange={(e) => setChatName(e.target.value)}
+                placeholder="Enter a name for your chat"
+                className="mt-1 h-11 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-300"
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="description" className="text-sm font-medium text-gray-700">
+                Description
+              </Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's this chat about? (optional)"
+                rows={3}
+                className="mt-1 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-300"
+              />
+            </div>
+            
+            <div>
+              <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Add Members ({selectedUsers.length} selected)
+              </Label>
+              <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden">
+                <ScrollArea className="h-40">
+                  {availableUsers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">No other users available</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+                  ) : (
+                    <div className="p-3 space-y-2">
+                      {availableUsers.map(user => (
+                        <div 
+                          key={user.id} 
+                          className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          <Checkbox
+                            id={`user-${user.id}`}
+                            checked={selectedUsers.includes(user.id)}
+                            onCheckedChange={() => handleUserToggle(user.id)}
+                          />
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium">
+                            {getInitials(user.name)}
+                          </div>
+                          <Label 
+                            htmlFor={`user-${user.id}`}
+                            className="text-sm font-normal cursor-pointer flex-1"
+                          >
+                            {user.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
           </div>
           
-          <div className="flex justify-end space-x-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -137,10 +175,18 @@ const CreateChatDialog = ({ open, onOpenChange, onCreateChat }) => {
             <Button
               type="submit"
               disabled={!chatName.trim() || isCreating}
+              className="bg-blue-500 hover:bg-blue-600"
             >
-              {isCreating ? 'Creating...' : 'Create Chat'}
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Chat'
+              )}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

@@ -26,13 +26,13 @@ const ChatMessage = ({ message }) => {
         <img 
           src={senderInfo.avatar_url} 
           alt={senderInfo.name}
-          className="w-8 h-8 rounded-full object-cover"
+          className="w-8 h-8 rounded-full object-cover shadow-sm"
         />
       );
     }
     
     return (
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center font-bold text-sm text-white">
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center font-semibold text-xs text-white shadow-sm">
         {getInitials(senderInfo.name)}
       </div>
     );
@@ -48,19 +48,21 @@ const ChatMessage = ({ message }) => {
       
       <div className={`max-w-md ${isSender ? 'order-first' : ''}`}>
         {!isSender && (
-          <p className="font-semibold text-sm mb-1 text-blue-600">
+          <p className="font-medium text-sm mb-1 text-gray-700">
             {senderInfo.name}
           </p>
         )}
         
-        <div className={`p-3 rounded-2xl ${
+        <div className={`px-4 py-3 rounded-2xl shadow-sm ${
           isSender 
-            ? 'bg-blue-500 text-white rounded-br-lg' 
-            : 'bg-white text-gray-800 rounded-bl-lg shadow-sm border border-gray-100'
+            ? 'bg-blue-500 text-white rounded-br-md' 
+            : 'bg-gray-50 text-gray-900 rounded-bl-md border border-gray-100'
         }`}>
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-          <p className={`text-xs mt-1 ${
-            isSender ? 'text-blue-200' : 'text-gray-400'
+          <p className="whitespace-pre-wrap break-words leading-relaxed text-sm">
+            {message.content}
+          </p>
+          <p className={`text-xs mt-2 ${
+            isSender ? 'text-blue-100' : 'text-gray-400'
           } text-right`}>
             {formatTime(message.created_at)}
           </p>
