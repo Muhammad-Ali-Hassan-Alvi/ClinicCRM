@@ -9,9 +9,6 @@ node_modules
 .temp
 
 # dotenvx
-.env.keys
-.env.local
-.env.*.local
 
 
 .env
