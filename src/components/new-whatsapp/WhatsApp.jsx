@@ -1,4 +1,3 @@
-// src/components/WhatsApp.jsx (FINAL - With Correct Logout/Disconnect Handling)
 import React, { useEffect, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import socket from "../../lib/whatsappSocket";
@@ -7,11 +6,11 @@ import InitialScreen from "./InitialScreen";
 import QRModal from "./QRModal";
 
 export default function WhatsApp() {
-  const [status, setStatus] = useState("initializing"); // initializing | qr_received | ready | disconnected
+  const [status, setStatus] = useState("initializing");
   const [qr, setQr] = useState(null);
   const [chats, setChats] = useState([]);
   const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(true); // General loading for initial connection
+  const [loading, setLoading] = useState(true);
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -22,26 +21,6 @@ export default function WhatsApp() {
   }, []);
 
   useEffect(() => {
-    // This function handles the response from our handshake
-    const handleInitialStatus = (payload) => {
-      if (!mounted.current) return;
-
-      if (payload.ready) {
-        setStatus("ready");
-        setConnected(true);
-        setChats(payload.chats || []);
-        toast.success("WhatsApp reconnected!");
-      } else if (payload.qr) {
-        setStatus("qr_received");
-        setQr(payload.qr);
-        setConnected(false);
-      } else {
-        setStatus("initializing");
-        setConnected(false);
-      }
-      setLoading(false);
-    };
-
     const onReady = () => {
       if (!mounted.current) return;
       setConnected(true);
@@ -61,6 +40,7 @@ export default function WhatsApp() {
 
     const onChats = (chatList) => {
       if (!mounted.current) return;
+      console.log("Received chats from backend:", chatList);
       setChats(chatList || []);
     };
 
@@ -69,15 +49,10 @@ export default function WhatsApp() {
       toast.error(msg || "An error occurred");
     };
 
-    // ===================================================================
-    // *** THE FIX IS HERE ***
-    // ===================================================================
-    // This handler now listens for the backend's 'status' event
     const handleStatusUpdate = (newStatus) => {
       if (!mounted.current) return;
       console.log("Received status update from backend:", newStatus);
 
-      // Update the main status, which controls the UI
       setStatus(newStatus);
 
       if (newStatus === "disconnected") {
@@ -87,12 +62,15 @@ export default function WhatsApp() {
         toast.error("WhatsApp was disconnected. Please reconnect.");
       } else if (newStatus === "ready") {
         setConnected(true);
+        setLoading(false);
+      } else if (newStatus === "authenticated") {
+        setLoading(false);
+        toast.success("Authentication successful!");
       } else {
         setConnected(false);
       }
     };
 
-    // This handles the physical socket disconnection (e.g., server restarts)
     const onSocketDisconnect = () => {
       if (!mounted.current) return;
       console.log("Socket disconnected. Resetting UI.");
@@ -104,22 +82,18 @@ export default function WhatsApp() {
       toast.error("Connection to server lost. Reconnecting...");
     };
 
-    // --- The new, robust connection logic ---
     const onConnect = () => {
-      console.log("Socket connected! Requesting initial status.");
-      setLoading(true);
-      socket.emit("request-initial-status");
+      console.log("Socket connected!");
+      setLoading(false);
     };
 
     // Register listeners
     socket.on("connect", onConnect);
-    socket.on("disconnect", onSocketDisconnect); // Use our new handler
-    socket.on("status", handleStatusUpdate); // Listen for status events
-    socket.on("initial-status", handleInitialStatus);
-    socket.on("qr", onQr);
+    socket.on("disconnect", onSocketDisconnect);
     socket.on("status", handleStatusUpdate);
+    socket.on("qr", onQr);
+    socket.on("ready", onReady);
     socket.on("chats", onChats);
-    socket.on("updateChats", onChats);
     socket.on("error-message", onError);
 
     if (socket.connected) {
@@ -129,15 +103,12 @@ export default function WhatsApp() {
     }
 
     return () => {
-      // Cleanup
       socket.off("connect", onConnect);
       socket.off("disconnect", onSocketDisconnect);
       socket.off("status", handleStatusUpdate);
-      socket.off("initial-status", handleInitialStatus);
       socket.off("qr", onQr);
       socket.off("ready", onReady);
       socket.off("chats", onChats);
-      socket.off("updateChats", onChats);
       socket.off("error-message", onError);
     };
   }, []);
@@ -166,7 +137,6 @@ export default function WhatsApp() {
     );
   }
 
-  // The main logic for what to render is now simpler
   const isReady = status === "ready" && connected;
 
   return (
