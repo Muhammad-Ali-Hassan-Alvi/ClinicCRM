@@ -1,5 +1,4 @@
 node_modules
-.env
 .wwebjs_auth
 .wwebjs_cache
 
@@ -9,12 +8,10 @@ node_modules
 .temp
 
 # dotenvx
-.env.keys
-.env.local
-.env.*.local
 
 
-.env
-.env.local
-.env.production
 .supabase/config.toml
+config.bat
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
